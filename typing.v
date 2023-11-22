@@ -1,8 +1,7 @@
-From PER Require Export syntax.
+From PER Require Export common.
 From Coq Require Import ssreflect ssrfun.
 From Hammer Require Import Tactics.
 
-Definition context n := fin n -> ty.
 (* Statics *)
 Reserved Notation "Γ '⊢' a '∈' A" (at level 70, no associativity).
 Inductive Wt {n : nat} (Γ : context n) : tm n -> ty -> Prop :=

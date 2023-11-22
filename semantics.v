@@ -1,7 +1,7 @@
-Require Export dynamics.
+Require Export dynamics common.
 From Coq Require Import ssreflect ssrfun.
 From Hammer Require Import Tactics Hammer.
-Check omap.
+
 Fixpoint PER_Nat (m : nat) (a b : tm 0) :=
   match m with
   | O => rtc Red a Zero /\ rtc Red b Zero
@@ -122,3 +122,71 @@ Proof.
     have ? : m = n by qauto depth:1 l:on inv:nat use:per_nat_fact1, per_nat_inj.
     sfirstorder use:per_nat_trans.
 Qed.
+
+Lemma per_nat_bclos m a b c : Red a b -> PER_Nat m b c -> PER_Nat m a c.
+Proof. elim : m a b c; hauto q:on ctrs:rtc. Qed.
+
+Lemma logeq_bclos (A : ty) (a b c : tm 0) : Red a b -> LogEq A b c -> LogEq A a c.
+Proof.
+  elim : A a b c.
+  - hauto lq:on ctrs:rtc, Red.
+  - sfirstorder use:per_nat_bclos.
+Qed.
+
+Lemma logeq_bclos2 (A : ty) (a0 a1 b c : tm 0) : Red a0 b -> Red a1 c -> LogEq A b c -> LogEq A a0 a1.
+Proof. hauto q:on use:logeq_bclos, logeq_sym. Qed.
+
+Definition γ_ok {n} (γ0 γ1 : fin n -> tm 0)  (Γ : context n) :=
+  forall i, LogEq (Γ i) (γ0 i) (γ1 i).
+
+Lemma γ_ok_cons {n} (γ0 γ1 : fin n -> tm 0)  (Γ : context n) (a b : tm 0) (A : ty)
+  (h : γ_ok γ0 γ1 Γ)
+  (h1 : LogEq A a b) :
+  γ_ok (a .: γ0) (b .: γ1) (A .: Γ).
+Proof.
+  rewrite /γ_ok /= in h *.
+  case => //.
+Qed.
+
+Definition SemWt {n} (Γ : context n) (a b : tm n) (A : ty) :=
+  forall γ0 γ1, γ_ok γ0 γ1 Γ -> LogEq A (subst_tm γ0 a) (subst_tm γ1 b).
+Notation "Γ '⊨' a '∼' b '∈' A"  := (SemWt Γ a b A) (at level 70, no associativity).
+
+Lemma ST_Var {n : nat} (Γ : context n) i :
+  Γ ⊨ var_tm i ∼ var_tm i ∈ Γ i.
+Proof. sfirstorder unfold:SemWt. Qed.
+
+Lemma ST_Zero {n : nat} (Γ : context n) :
+  Γ ⊨ Zero ∼ Zero ∈ Nat.
+Proof.
+  move => γ0 γ1 hγ.
+  exists 0. sfirstorder use:relations.rtc_refl.
+Qed.
+
+Lemma ST_Succ {n : nat} (Γ : context n) a b :
+  Γ ⊨ a ∼ b ∈ Nat ->
+  Γ ⊨ Succ a ∼ Succ b ∈ Nat.
+Proof.
+  rewrite /SemWt.
+  move => h γ0 γ1 hγ.
+  case /h : hγ => m ?.
+  exists (S m).
+  hauto lq:on ctrs:rtc.
+Qed.
+
+Lemma ST_Lam {n : nat} (Γ : context n) A a0 a1 B :
+  A .: Γ ⊨ a0 ∼ a1 ∈ B ->
+  Γ ⊨ Lam A a0 ∼ Lam A a1 ∈ Fun A B.
+Proof.
+  rewrite /SemWt /= => h γ0 γ1 hγ q0 q1 hq.
+  apply : logeq_bclos2.
+  - sfirstorder ctrs:Red.
+  - sfirstorder ctrs:Red.
+  - asimpl. sfirstorder use:γ_ok_cons.
+Qed.
+
+Lemma ST_App {n : nat} (Γ : context n) a0 a1 A B b0 b1 :
+  Γ ⊨ b0 ∼ b1 ∈ Fun A B ->
+  Γ ⊨ a0 ∼ a1 ∈ A ->
+  Γ ⊨ App b0 a0 ∼ App b1 a1 ∈ B.
+Proof. hauto q:on unfold:SemWt. Qed.
