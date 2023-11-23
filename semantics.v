@@ -1,6 +1,7 @@
 Require Export dynamics common.
 From Coq Require Import ssreflect ssrfun.
 From Hammer Require Import Tactics Hammer.
+Import stdpp.relations (rtc_ind_l, rtc_refl).
 
 Fixpoint PER_Nat (m : nat) (a b : tm 0) :=
   match m with
@@ -40,13 +41,16 @@ Lemma deter_prop {A}
   (h1 : rtc P a c) :
   rtc P b c \/ rtc P c b.
 Proof.
-  move : c h1.
-  elim : a b / h.
+  move : a h c h1.
+  apply : rtc_ind_l.
   - sfirstorder.
-  - move => x y z h0 h1 ih c hx.
-    inversion hx; subst.
-    sauto lq:on.
-    hfcrush ctrs:rtc.
+  - move => x y h0 h1 ih.
+    move => c h2.
+    move: h0.
+    case : x c / h2.
+    + hauto lq:on rew:off ctrs:rtc.
+    + move => x y0 z h3 h4 h5.
+      suff : y0 = y; hauto l:on.
 Qed.
 
 Lemma red_deter_ba {n} (a b c : tm n) : Reds a b -> Reds a c -> Reds b c \/ Reds c b.
@@ -160,7 +164,7 @@ Lemma ST_Zero {n : nat} (Γ : context n) :
   Γ ⊨ Zero ∼ Zero ∈ Nat.
 Proof.
   move => γ0 γ1 hγ.
-  exists 0. sfirstorder use:relations.rtc_refl.
+  exists 0. sfirstorder use:rtc_refl.
 Qed.
 
 Lemma ST_Succ {n : nat} (Γ : context n) a b :
@@ -239,5 +243,3 @@ Proof.
   move /(_ (b0 .: (a0 .: γ0)) (b1 .: (a1 .: γ1)) ltac:(by eauto using γ_ok_cons)) in h2.
   move : h2. by asimpl.
 Qed.
-
-#[export]Hint Resolve ST_Var ST_Lam ST_App ST_Zero ST_Succ ST_Rec : semwt.
