@@ -18,21 +18,11 @@ Fixpoint LogEq (A : ty) (f g : tm 0) : Prop :=
 Lemma per_nat_sym m : forall a b, PER_Nat m a b -> PER_Nat m b a.
 Proof. elim : m; firstorder. Qed.
 
-Fixpoint RedOpt {n} a : option (tm n) :=
-  match a with
-  | App (Lam A a) b => Some (subst_tm (b..) a)
-  | App a b => omap (fun a => App a b) (RedOpt a)
-  | Rec Zero b0 b1 => Some b0
-  | Rec (Succ a) b0 b1 => Some (subst_tm (Rec a b0 b1 .: (a..)) b1)
-  | Rec a b0 b1 => omap (fun a => Rec a b0 b1) (RedOpt a)
-  | _ => None
-  end.
-
-Lemma red_redopt {n} (a b : tm n) : Red a b -> RedOpt a = Some b.
-Proof. induction 1; hauto lq:on. Qed.
-
 Lemma red_deterministic {n} (a b c : tm n) : Red a b -> Red a c -> b = c.
-Proof. hauto lq:on rew:off ctrs:- inv:Red use:red_redopt. Qed.
+Proof.
+  move => h. move : c.
+  induction h; hauto lq:on rew:off ctrs:Red inv:Red.
+Qed.
 
 Lemma deter_prop {A}
  (P : A -> A -> Prop) (a b c : A)
