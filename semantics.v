@@ -239,3 +239,5 @@ Proof.
   move /(_ (b0 .: (a0 .: γ0)) (b1 .: (a1 .: γ1)) ltac:(by eauto using γ_ok_cons)) in h2.
   move : h2. by asimpl.
 Qed.
+
+#[export]Hint Resolve ST_Var ST_Lam ST_App ST_Zero ST_Succ ST_Rec : semwt.
