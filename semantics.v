@@ -28,14 +28,10 @@ Fixpoint RedOpt {n} a : option (tm n) :=
   end.
 
 Lemma red_redopt {n} (a b : tm n) : Red a b -> RedOpt a = Some b.
-Proof.
-  induction 1; hauto lq:on.
-Qed.
+Proof. induction 1; hauto lq:on. Qed.
 
 Lemma red_deterministic {n} (a b c : tm n) : Red a b -> Red a c -> b = c.
-Proof.
-  hauto lq:on rew:off ctrs:- inv:Red use:red_redopt.
-Qed.
+Proof. hauto lq:on rew:off ctrs:- inv:Red use:red_redopt. Qed.
 
 Lemma deter_prop {A}
  (P : A -> A -> Prop) (a b c : A)
@@ -54,9 +50,7 @@ Proof.
 Qed.
 
 Lemma red_deter_ba {n} (a b c : tm n) : Reds a b -> Reds a c -> Reds b c \/ Reds c b.
-Proof.
-  hauto lq:on rew:off use:@red_deterministic,deter_prop.
-Qed.
+Proof. hauto lq:on rew:off use:@red_deterministic,deter_prop. Qed.
 
 Lemma reds_succ_succ {n} (a b : tm n) : Reds (Succ a) b -> Succ a = b.
 Proof. move E : (Succ a) => a' h.
@@ -133,8 +127,14 @@ Proof.
   - sfirstorder use:per_nat_bclos.
 Qed.
 
+Lemma logeq_bclos' (A : ty) (a b c : tm 0) : Reds a b -> LogEq A b c -> LogEq A a c.
+Proof. induction 1; sfirstorder use:logeq_bclos. Qed.
+
 Lemma logeq_bclos2 (A : ty) (a0 a1 b c : tm 0) : Red a0 b -> Red a1 c -> LogEq A b c -> LogEq A a0 a1.
 Proof. hauto q:on use:logeq_bclos, logeq_sym. Qed.
+
+Lemma logeq_bclos2' (A : ty) (a0 a1 b c : tm 0) : Reds a0 b -> Reds a1 c -> LogEq A b c -> LogEq A a0 a1.
+Proof. hauto q:on use:logeq_bclos', logeq_sym. Qed.
 
 Definition γ_ok {n} (γ0 γ1 : fin n -> tm 0)  (Γ : context n) :=
   forall i, LogEq (Γ i) (γ0 i) (γ1 i).
@@ -190,3 +190,52 @@ Lemma ST_App {n : nat} (Γ : context n) a0 a1 A B b0 b1 :
   Γ ⊨ a0 ∼ a1 ∈ A ->
   Γ ⊨ App b0 a0 ∼ App b1 a1 ∈ B.
 Proof. hauto q:on unfold:SemWt. Qed.
+
+Lemma Reds_Rec {n} (a0 a1 b : tm n) c :
+  Reds a0 a1 ->
+  (* ------------------------------ *)
+  Reds (Rec a0 b c) (Rec a1 b c).
+Proof. induction 1; hauto lq:on ctrs:Red, rtc. Qed.
+
+Lemma ST_Rec_ind a0 a1 b0 b1 c0 c1 A :
+  LogEq Nat a0 a1 ->
+  LogEq A b0 b1 ->
+  (forall a0 b0 a1 b1,
+      LogEq Nat a0 a1 ->
+      LogEq A b0 b1 ->
+      LogEq A (subst_tm (b0 .: (a0 .: ids)) c0) (subst_tm (b1 .: (a1 .: ids)) c1)) ->
+  LogEq A (Rec a0 b0 c0) (Rec a1 b1 c1).
+Proof.
+  case.
+  move => n h0 h1 h2.
+  move : a0 a1 h0.
+  elim : n.
+  - simpl.
+    move => a0 a1 *.
+    have h : LogEq A (Rec Zero b0 c0) (Rec Zero b1 c1) by hauto lq:on use:logeq_bclos2 ctrs:Red.
+    hauto lq:on use:Reds_Rec, logeq_bclos2'.
+  - move => n ih a0 a1 /=.
+    intros (a2 & b2 & h3 & h4 & h5).
+    have h5' := h5.
+    apply ih in h5'.
+    eapply h2 in h5'; last by sfirstorder.
+    have h :LogEq A (Rec (Succ a2) b0 c0) (Rec (Succ b2) b1 c1) by hauto lq:on use:logeq_bclos2 ctrs:Red.
+    hauto lq:on use:Reds_Rec, logeq_bclos2'.
+Qed.
+
+Lemma ST_Rec {n : nat} (Γ : context n) a0 a1 b0 b1 A c0 c1 :
+  Γ ⊨ a0 ∼ a1 ∈ Nat ->
+  Γ ⊨ b0 ∼ b1 ∈ A ->
+  A .: (Nat .: Γ) ⊨ c0 ∼ c1 ∈ A ->
+  Γ ⊨ Rec a0 b0 c0 ∼ Rec a1 b1 c1 ∈ A.
+Proof.
+  rewrite /SemWt.
+  move => h0 h1 h2 γ0 γ1 hγ.
+  specialize h0 with (1 := hγ).
+  specialize h1 with (1 := hγ).
+  simpl.
+  apply ST_Rec_ind; eauto.
+  move {a0 a1 b0 b1 h0 h1} =>  a0 b0 a1 b1 *.
+  move /(_ (b0 .: (a0 .: γ0)) (b1 .: (a1 .: γ1)) ltac:(by eauto using γ_ok_cons)) in h2.
+  move : h2. by asimpl.
+Qed.
